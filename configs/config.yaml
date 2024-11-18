@@ -1,0 +1,4 @@
+queues:
+  - name: test_messages
+    max_messages: 100
+    max_subscribers: 3
