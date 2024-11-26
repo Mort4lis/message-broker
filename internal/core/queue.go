@@ -25,7 +25,7 @@ type Queue struct {
 func NewQueue(queueSize, maxSubscribers int64) *Queue {
 	return &Queue{
 		maxSubscribers: maxSubscribers,
-		evCh:           make(chan event, 1),
+		evCh:           make(chan event),
 		msgCh:          make(chan Message, queueSize),
 	}
 }
@@ -33,14 +33,14 @@ func NewQueue(queueSize, maxSubscribers int64) *Queue {
 func (q *Queue) Append(msg Message) error {
 	select {
 	case q.msgCh <- msg:
-		q.evCh <- newSendMessageEvent()
+		q.evCh <- event{Type: sendMessageEventType}
 		return nil
 	default:
 		return ErrQueueOverflowed
 	}
 }
 
-func (q *Queue) Subscribe() (*Subscriber, error) {
+func (q *Queue) Subscribe() (*Consumer, error) {
 	for {
 		curSubscribers := atomic.LoadInt64(&q.curSubscribers)
 		if curSubscribers+1 >= q.maxSubscribers {
@@ -51,31 +51,30 @@ func (q *Queue) Subscribe() (*Subscriber, error) {
 		}
 	}
 
-	sub := newSubscriber()
-	q.evCh <- newSubscribeEvent(sub)
-	return sub, nil
+	cons := newConsumer(cap(q.msgCh))
+	cons.setCloseCallback(func() {
+		q.evCh <- event{Type: unsubscribeEventType, Consumer: cons}
+	})
+	q.evCh <- event{Type: subscribeEventType, Consumer: cons}
+	return cons, nil
 }
 
-func (q *Queue) Unsubscribe(sub *Subscriber) {
-	if !sub.IsActive() {
-		return
-	}
-
+func (q *Queue) unsubscribe(cons *Consumer) {
 	curSubscribers := atomic.LoadInt64(&q.curSubscribers)
 	for !atomic.CompareAndSwapInt64(&q.curSubscribers, curSubscribers, curSubscribers-1) {
 		curSubscribers = atomic.LoadInt64(&q.curSubscribers)
 	}
-	q.evCh <- newUnsubscribeEvent(sub)
+	close(cons.bufCh)
 }
 
-func (q *Queue) Run(ctx context.Context) {
+func (q *Queue) StartConsume(ctx context.Context) {
 	q.once.Do(func() {
-		go q.run(ctx)
+		go q.startConsume(ctx)
 	})
 }
 
-func (q *Queue) run(ctx context.Context) {
-	subscribers := make(map[*Subscriber]struct{})
+func (q *Queue) startConsume(ctx context.Context) {
+	consumers := make(map[string]*Consumer, q.maxSubscribers)
 
 	for {
 		select {
@@ -85,24 +84,22 @@ func (q *Queue) run(ctx context.Context) {
 			switch ev.Type {
 			case sendMessageEventType:
 			case subscribeEventType:
-				sub := ev.Meta.(subscriberMeta).Subscriber
-				subscribers[sub] = struct{}{}
+				consumers[ev.Consumer.ID()] = ev.Consumer
 			case unsubscribeEventType:
-				sub := ev.Meta.(subscriberMeta).Subscriber
-				if _, ok := subscribers[sub]; ok {
-					delete(subscribers, sub)
-					sub.close()
+				q.unsubscribe(ev.Consumer)
+				delete(consumers, ev.Consumer.ID())
+				continue
+			}
+
+			if len(consumers) == 0 {
+				continue
+			}
+			select {
+			case msg := <-q.msgCh:
+				for _, cons := range consumers {
+					cons.bufCh <- msg
 				}
-				continue
-			}
-
-			if len(subscribers) == 0 {
-				continue
-			}
-
-			msg := <-q.msgCh
-			for sub := range subscribers {
-				sub.outcomeCh <- msg
+			default:
 			}
 		}
 	}
