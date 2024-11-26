@@ -15,19 +15,27 @@ var (
 type Message []byte
 
 type Queue struct {
+	name           string
 	maxSubscribers int64
 	curSubscribers int64
 	msgCh          chan Message
 	evCh           chan event
+	doneCh         chan struct{}
 	once           sync.Once
 }
 
-func NewQueue(queueSize, maxSubscribers int64) *Queue {
+func NewQueue(name string, queueSize, maxSubscribers int64) *Queue {
 	return &Queue{
+		name:           name,
 		maxSubscribers: maxSubscribers,
 		evCh:           make(chan event),
+		doneCh:         make(chan struct{}, 1),
 		msgCh:          make(chan Message, queueSize),
 	}
+}
+
+func (q *Queue) Name() string {
+	return q.name
 }
 
 func (q *Queue) Append(msg Message) error {
@@ -75,6 +83,7 @@ func (q *Queue) StartConsume(ctx context.Context) {
 
 func (q *Queue) startConsume(ctx context.Context) {
 	consumers := make(map[string]*Consumer, q.maxSubscribers)
+	defer func() { q.doneCh <- struct{}{} }()
 
 	for {
 		select {
@@ -103,4 +112,8 @@ func (q *Queue) startConsume(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (q *Queue) Wait() {
+	<-q.doneCh
 }

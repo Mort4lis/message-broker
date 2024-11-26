@@ -1,4 +1,9 @@
+http_server:
+  listen: ":8080"
+
 queues:
   - name: test_messages
     max_messages: 100
     max_subscribers: 3
+
+shutdown_timeout: "10s"
