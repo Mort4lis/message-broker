@@ -1,12 +1,12 @@
 logging:
   level: debug
-  format: json
+  format: text
 
 http_server:
   listen: ":8080"
   read_timeout: 10s
   read_header_timeout: 5s
-  write_timeout: 10s
+  request_timeout: 10s
 
 queues:
   - name: test

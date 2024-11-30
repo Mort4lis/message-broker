@@ -38,6 +38,7 @@ linters-settings:
     # See https://github.com/kisielk/errcheck#excluding-functions for details.
     exclude-functions:
       - io.Copy
+      - (net/http.ResponseWriter).Write
 
   errorlint:
     # Check whether fmt.Errorf uses the %w verb for formatting errors.

@@ -110,12 +110,15 @@ func (q *Queue) handleEvent(consumers map[string]*Consumer, ev event) {
 		return
 	}
 
-	select {
-	case msg := <-q.msgCh:
-		for _, cons := range consumers {
-			cons.bufCh <- msg
+	for {
+		select {
+		case msg := <-q.msgCh:
+			for _, cons := range consumers {
+				cons.bufCh <- msg
+			}
+		default:
+			return
 		}
-	default:
 	}
 }
 

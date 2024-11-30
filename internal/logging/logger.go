@@ -41,8 +41,7 @@ func NewLoggerFromConfig(conf config.Logging) (*slog.Logger, error) {
 	}
 
 	opts := &slog.HandlerOptions{
-		AddSource: true,
-		Level:     level,
+		Level: level,
 	}
 
 	switch strings.ToLower(conf.Format) {

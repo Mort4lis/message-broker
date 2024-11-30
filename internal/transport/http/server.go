@@ -12,6 +12,7 @@ import (
 	"github.com/Mort4lis/message-broker/internal/config"
 	"github.com/Mort4lis/message-broker/internal/core"
 	v1 "github.com/Mort4lis/message-broker/internal/transport/http/v1"
+	"github.com/Mort4lis/message-broker/pkg/httputils/middleware"
 )
 
 type Server struct {
@@ -26,8 +27,11 @@ func NewServer(logger *slog.Logger, conf config.HTTPServer, reg *core.QueueRegis
 	router.Handler(http.MethodPost, "/v1/queues/:queue_name/subscriptions", http.HandlerFunc(h.Subscribe))
 
 	srv := &http.Server{
-		Addr:              conf.Listen,
-		Handler:           router,
+		Addr: conf.Listen,
+		Handler: middleware.Timeout(
+			conf.RequestTimeout,
+			middleware.Log(logger, router),
+		),
 		ErrorLog:          slog.NewLogLogger(logger.Handler(), slog.LevelError),
 		ReadTimeout:       conf.ReadTimeout,
 		ReadHeaderTimeout: conf.ReadHeaderTimeout,

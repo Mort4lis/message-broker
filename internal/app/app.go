@@ -47,8 +47,8 @@ func Run(confPath string) error {
 	httpServer := http.NewServer(logger, conf.HTTPServer, registry)
 	go func() {
 		logger.Info("Listen http server", slog.String("addr", conf.HTTPServer.Listen))
-		if err = httpServer.Run(); err != nil {
-			errCh <- fmt.Errorf("run http server: %v", err)
+		if runErr := httpServer.Run(); runErr != nil {
+			errCh <- fmt.Errorf("run http server: %v", runErr)
 		}
 	}()
 

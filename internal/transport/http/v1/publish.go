@@ -20,19 +20,19 @@ func (h *Handler) Publish(w http.ResponseWriter, req *http.Request) {
 	queue, ok := h.reg.GetByName(queueName)
 	if !ok {
 		logger.Error("queue is not found")
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
 	payload, err := io.ReadAll(req.Body)
 	if err != nil {
-		logger.Error("read body", slog.Any("error", err))
+		logger.Error("failed to read body", slog.Any("error", err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	if err = queue.Append(payload); err != nil {
-		logger.Error("append message to queue", slog.Any("error", err))
+		logger.Error("failed to append message to queue", slog.Any("error", err))
 		if errors.Is(err, core.ErrQueueOverflowed) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		} else {

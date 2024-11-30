@@ -37,10 +37,6 @@ func (c *Consumer) ReadMessage(ctx context.Context) (Message, error) {
 	}
 }
 
-func (c *Consumer) MessageChan() <-chan Message {
-	return c.bufCh
-}
-
 func (c *Consumer) setCloseCallback(cb func()) {
 	c.closeCb = cb
 }

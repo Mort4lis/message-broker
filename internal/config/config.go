@@ -10,10 +10,11 @@ type Logging struct {
 }
 
 type HTTPServer struct {
-	Listen            string        `env-default:":8080" yaml:"listen"`
-	ReadTimeout       time.Duration `env-default:"10s"   yaml:"read_timeout"`
-	ReadHeaderTimeout time.Duration `env-default:"5s"    yaml:"read_header_timeout"`
-	WriteTimeout      time.Duration `env-default:"10s"   yaml:"write_timeout"`
+	Listen            string        `env-default:":8080"  yaml:"listen"`
+	ReadTimeout       time.Duration `env-default:"10s"    yaml:"read_timeout"`
+	ReadHeaderTimeout time.Duration `env-default:"5s"     yaml:"read_header_timeout"`
+	WriteTimeout      time.Duration `yaml:"write_timeout"`
+	RequestTimeout    time.Duration `env-default:"30s"    yaml:"request_timeout"`
 }
 
 type Queue struct {
