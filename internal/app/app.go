@@ -12,6 +12,7 @@ import (
 
 	"github.com/Mort4lis/message-broker/internal/config"
 	"github.com/Mort4lis/message-broker/internal/core"
+	"github.com/Mort4lis/message-broker/internal/logging"
 	"github.com/Mort4lis/message-broker/internal/transport/http"
 )
 
@@ -21,13 +22,15 @@ func Run(confPath string) error {
 		return fmt.Errorf("read config: %v", err)
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	slog.SetDefault(logger)
+	logger, err := logging.NewLoggerFromConfig(conf.Logging)
+	if err != nil {
+		return fmt.Errorf("create logger: %v", err)
+	}
 
 	registry := core.NewQueueRegistry()
 	for _, queueConf := range conf.Queues {
 		queue := core.NewQueue(queueConf.Name, queueConf.MaxMessages, queueConf.MaxSubscribers)
-		if err := registry.Register(queue); err != nil {
+		if err = registry.Register(queue); err != nil {
 			return fmt.Errorf("register queue with name %s: %v", queue.Name(), err)
 		}
 	}
@@ -41,10 +44,10 @@ func Run(confPath string) error {
 	})
 
 	errCh := make(chan error)
-	httpServer := http.NewServer(conf.HTTPServer, registry)
+	httpServer := http.NewServer(logger, conf.HTTPServer, registry)
 	go func() {
-		logger.Info(fmt.Sprintf("Listen http server %s", conf.HTTPServer.Listen))
-		if err := httpServer.Run(); err != nil {
+		logger.Info("Listen http server", slog.String("addr", conf.HTTPServer.Listen))
+		if err = httpServer.Run(); err != nil {
 			errCh <- fmt.Errorf("run http server: %v", err)
 		}
 	}()
@@ -53,14 +56,14 @@ func Run(confPath string) error {
 	signal.Notify(quit, syscall.SIGTERM, os.Interrupt)
 
 	select {
-	case err := <-errCh:
+	case err = <-errCh:
 		return err
 	case sig := <-quit:
-		logger.Info(fmt.Sprintf("Caught signal %s. Shutting down...", sig))
+		logger.Info("Caught signal. Shutting down...", slog.String("signal", sig.String()))
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), conf.ShutdownTimeout)
 		defer shutdownCancel()
 
-		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		if err = httpServer.Shutdown(shutdownCtx); err != nil {
 			logger.Error("Failed to shutdown http server", slog.String("error", err.Error()))
 		}
 

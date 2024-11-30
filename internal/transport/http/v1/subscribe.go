@@ -5,5 +5,5 @@ import (
 )
 
 func (h *Handler) Subscribe(w http.ResponseWriter, req *http.Request) {
-	w.Write([]byte(req.URL.String()))
+	_, _ = w, req
 }

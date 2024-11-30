@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
@@ -17,16 +18,20 @@ type Server struct {
 	srv *http.Server
 }
 
-func NewServer(conf config.HTTPServer, reg *core.QueueRegistry) *Server {
-	h := v1.NewHandler(reg)
+func NewServer(logger *slog.Logger, conf config.HTTPServer, reg *core.QueueRegistry) *Server {
+	h := v1.NewHandler(logger, reg)
 
 	router := httprouter.New()
 	router.Handler(http.MethodPost, "/v1/queues/:queue_name/messages", http.HandlerFunc(h.Publish))
 	router.Handler(http.MethodPost, "/v1/queues/:queue_name/subscriptions", http.HandlerFunc(h.Subscribe))
 
 	srv := &http.Server{
-		Addr:    conf.Listen,
-		Handler: router,
+		Addr:              conf.Listen,
+		Handler:           router,
+		ErrorLog:          slog.NewLogLogger(logger.Handler(), slog.LevelError),
+		ReadTimeout:       conf.ReadTimeout,
+		ReadHeaderTimeout: conf.ReadHeaderTimeout,
+		WriteTimeout:      conf.WriteTimeout,
 	}
 	return &Server{srv: srv}
 }
@@ -39,5 +44,5 @@ func (s *Server) Run() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	return s.srv.Shutdown(ctx)
+	return s.srv.Shutdown(ctx) //nolint:wrapcheck // no need to wrap error
 }

@@ -15,12 +15,12 @@ var (
 type Message []byte
 
 type Queue struct {
-	name           string
-	maxSubscribers int64
-	curSubscribers int64
 	msgCh          chan Message
 	evCh           chan event
 	doneCh         chan struct{}
+	name           string
+	maxSubscribers int64
+	curSubscribers int64
 	once           sync.Once
 }
 
@@ -90,27 +90,32 @@ func (q *Queue) startConsume(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case ev := <-q.evCh:
-			switch ev.Type {
-			case sendMessageEventType:
-			case subscribeEventType:
-				consumers[ev.Consumer.ID()] = ev.Consumer
-			case unsubscribeEventType:
-				q.unsubscribe(ev.Consumer)
-				delete(consumers, ev.Consumer.ID())
-				continue
-			}
-
-			if len(consumers) == 0 {
-				continue
-			}
-			select {
-			case msg := <-q.msgCh:
-				for _, cons := range consumers {
-					cons.bufCh <- msg
-				}
-			default:
-			}
+			q.handleEvent(consumers, ev)
 		}
+	}
+}
+
+func (q *Queue) handleEvent(consumers map[string]*Consumer, ev event) {
+	switch ev.Type {
+	case sendMessageEventType:
+	case subscribeEventType:
+		consumers[ev.Consumer.ID()] = ev.Consumer
+	case unsubscribeEventType:
+		q.unsubscribe(ev.Consumer)
+		delete(consumers, ev.Consumer.ID())
+		return
+	}
+
+	if len(consumers) == 0 {
+		return
+	}
+
+	select {
+	case msg := <-q.msgCh:
+		for _, cons := range consumers {
+			cons.bufCh <- msg
+		}
+	default:
 	}
 }
 

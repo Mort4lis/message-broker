@@ -9,6 +9,6 @@ const (
 )
 
 type event struct {
-	Type     eventType
 	Consumer *Consumer
+	Type     eventType
 }

@@ -8,9 +8,9 @@ import (
 )
 
 type Consumer struct {
-	id      string
 	bufCh   chan Message
 	closeCb func()
+	id      string
 	closed  bool
 }
 
